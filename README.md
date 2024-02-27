@@ -1,3 +1,17 @@
+## 踩坑日記
+
+**目前沒坑嘿嘿**
+
+```
+conda install ninja
+conda install -c "nvidia/label/cuda-11.7.1" cuda-toolkit
+ln -s "$CONDA_PREFIX/lib" "$CONDA_PREFIX/lib64"  
+pip install torch==2.0.1 torchvision==0.15.2  
+pip install -r requirements.txt  # can take a while for compiling pytorch3d and nvdiffrast
+```
+
+---
+
 # GaussianAvatars: Photorealistic Head Avatars with Rigged 3D Gaussians
 
 ![Method](assets/method.jpg)
