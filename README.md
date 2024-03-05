@@ -10,6 +10,14 @@ pip install torch==2.0.1 torchvision==0.15.2
 pip install -r requirements.txt  # can take a while for compiling pytorch3d and nvdiffrast
 ```
 
+**train**
+```
+SUBJECT=306 && python train.py \
+-s data/UNION10_${SUBJECT}_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine \
+-m output/UNION10EMOEXP_${SUBJECT}_eval_600k \
+--port 60000 --eval --white_background --bind_to_mesh
+```
+
 ---
 
 # GaussianAvatars: Photorealistic Head Avatars with Rigged 3D Gaussians
