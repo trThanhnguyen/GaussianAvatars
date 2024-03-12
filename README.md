@@ -27,6 +27,21 @@ python render.py \
 --skip_train --skip_test
 ```
 
+## FLAME
+
+for each image:
+**translation** (1, 3)
+**rotation** (1, 3)
+**neck_pose** (1, 3)
+**jaw_pose** (1, 3)
+**eyes_pose** (1, 6)
+**shape** (300, )
+**expr** (1, 100)
+**static_offset** (1, 5143, 3)
+
+
+
+
 ---
 
 # GaussianAvatars: Photorealistic Head Avatars with Rigged 3D Gaussians

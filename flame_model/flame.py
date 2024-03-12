@@ -103,8 +103,8 @@ class FlameHead(nn.Module):
         )
 
         # The shape components and expression
-        shapedirs = to_tensor(to_np(flame_model.shapedirs), dtype=self.dtype)
-        shapedirs = torch.cat(
+        shapedirs = to_tensor(to_np(flame_model.shapedirs), dtype=self.dtype) # DECA用100-shape/50-expr，GaussianAvatars用300-shape/100-expr
+        shapedirs = torch.cat( # shape, expr是放一起的 shape總共300個basis，shapedirs[0:300]是shape，shapedirs[300:]是expr 
             [shapedirs[:, :, :shape_params], shapedirs[:, :, 300 : 300 + expr_params]],
             2,
         )
