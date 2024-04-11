@@ -343,12 +343,19 @@ if __name__ == "__main__":
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)
-    safe_state(args.quiet)
+    # for 調整系統狀態
+    # 制定在執行期間重定向 sys.stdout到一個 class F的instance，F會看是否要在每一行結尾加入timestamp和endline
+    safe_state(args.quiet) 
 
     # Start GUI server, configure and run training
-    network_gui.init(args.ip, args.port)
+    # 設定圖形化介面
+    network_gui.init(args.ip, args.port) # 設定
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
+    # 輸入包括 ()
     training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
 
     # All done
     print("\nTraining complete.")
+
+    ## Explain ##
+    ## https://blog.csdn.net/gwplovekimi/article/details/135500438

@@ -113,7 +113,7 @@ def safe_state(silent):
     old_f = sys.stdout
     class F:
         def __init__(self, silent):
-            self.silent = silent
+            self.silent = silent # slient如果不是默認就在結尾加入timestamp
 
         def write(self, x):
             if not self.silent:
@@ -123,11 +123,12 @@ def safe_state(silent):
                     old_f.write(x)
 
         def flush(self):
-            old_f.flush()
+            old_f.flush() # 刷新緩衝區
 
     sys.stdout = F(silent)
-
+    
+    # 設定亂數種子
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
-    torch.cuda.set_device(torch.device("cuda:0"))
+    torch.cuda.set_device(torch.device("cuda:0")) # 設定 GPU
