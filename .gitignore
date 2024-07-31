@@ -6,4 +6,9 @@ diff_rasterization/diff_rast.egg-info
 diff_rasterization/dist
 tensorboard_3d
 screenshots
-job/
+orbit_rendering/
+flame_emote_coeffs/
+flame_voca_coeffs/
+sandbox/
+
+data/

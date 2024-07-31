@@ -10,23 +10,25 @@ pip install torch==2.0.1 torchvision==0.15.2
 pip install -r requirements.txt  # can take a while for compiling pytorch3d and nvdiffrast
 ```
 
-**train**
+**Train**
 ```
 SUBJECT=218 
+ITER=600k
 python train.py \
 -s data/${SUBJECT}/UNION10_${SUBJECT}_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine \
--m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
 --port 60000 --eval --white_background --bind_to_mesh
 ```
 
-**render**
+**Render**
 ```
 SUBJECT=218
+ITER=600
 python render.py \
--m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
 --skip_train --skip_test
 ```
-**render with custom FLAME params**
+**Render with custom FLAME params**
 - ```MODE``` : method of generating FLAME params, either ```emote``` or ```voca```
 - ```SUBJECT``` : target ID 
 - ```FLAME_FILE``` : flame file name  
@@ -34,18 +36,35 @@ python render.py \
 - ```AUDIO``` : audio name, for experiment naming. 
 ```
 SUBJECT=218
+ITER=600k
 MODE=emote
-FLAMEFILE='flame_218_Obama_Sad_1.pkl'
+FLAME_FILE='flame_218_Obama_Sad_1.pkl'
 CAM_ID=0
 AUDIO=obama
 
 python render_param.py \
--m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
 --skip_val --skip_test \
 --flame flame_${MODE}_coeffs/${FLAME_FILE} \
 --expname ${SUBJECT}_${MODE}_${AUDIO}_cam_${CAM_ID} \
 --select_camera_id ${CAM_ID} --mode ${MODE}
 ```
+**Render with orbit camera & custom FLAME params**
+```
+SUBJECT=074
+ITER=600k
+python orbit_render.py \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
+--flame flame_emote_coeffs/flame_074_Chinese_neutral.pkl \
+--mode emote \
+--runname 074_emote_Chinese_orbit
+```
+
+Where,
+- ```-m``` : trained model path
+- ```--mode``` : method of generating FLAME params, either ```emote``` or ```voca```
+- ```--flame``` : flame file name containing varying expression
+- ```--runname``` : experiment name, for output naming purpose.
 
 
 ## FLAME

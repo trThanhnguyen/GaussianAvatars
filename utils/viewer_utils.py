@@ -6,6 +6,8 @@
 # is strictly prohibited.
 #
 
+import torch
+from dataclasses import dataclass
 from typing import Tuple, Literal
 import math
 import numpy as np
@@ -180,3 +182,16 @@ class OrbitCamera:
         # pan in camera coordinate system (careful on the sensitivity!)
         d = np.array([dx, -dy, dz])  # the y axis is flipped
         self.look_at += 2 * self.rot.as_matrix()[:3, :3] @ d * self.radius / self.image_height * math.tan(np.radians(self.fovy) / 2)
+    def pop_view(self, reset=True):
+        @dataclass
+        class View:
+            FoVx = float(np.radians(self.fovx))
+            FoVy = float(np.radians(self.fovy))
+            image_height = self.image_height
+            image_width = self.image_width
+            world_view_transform = torch.tensor(self.world_view_transform).float().cuda().T  # the transpose is required by gaussian splatting rasterizer
+            full_proj_transform = torch.tensor(self.full_proj_transform).float().cuda().T  # the transpose is required by gaussian splatting rasterizer
+            camera_center = torch.tensor(self.pose[:3, 3]).cuda()
+            if reset:
+                self.reset()
+        return View
