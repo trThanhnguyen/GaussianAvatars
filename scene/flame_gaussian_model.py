@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import torch
 # from vht.model.flame import FlameHead
+# from flame_model.flame_v1 import FlameHead
 from flame_model.flame import FlameHead
 
 from .gaussian_model import GaussianModel
@@ -114,6 +115,28 @@ class FlameGaussianModel(GaussianModel):
         )
         self.update_mesh_properties(verts, verts_cano)
 
+    def update_mesh_by_param_expr_dict(self, expr_param, jaw_pose, slow_eye, fix_zero_pose=False, fix_zero_neck=False, idx=0):
+
+        if fix_zero_pose:
+            self.flame_param['rotation'] = torch.zeros(self.flame_param['rotation'].shape).cuda()
+        if fix_zero_neck:
+            self.flame_param['neck_pose'] = torch.zeros(self.flame_param['neck_pose'].shape).cuda()
+
+        verts, verts_cano = self.flame_model(
+            self.flame_param['shape'][None, ...],
+            expr_param.cuda(),
+            self.flame_param['rotation'][idx].unsqueeze(0),
+            self.flame_param['neck_pose'][idx].unsqueeze(0),
+            jaw_pose.cuda(), # self.flame_param['jaw_pose'][0].unsqueeze(0) / jaw_pose.cuda()
+            self.flame_param['eyes_pose'][idx//slow_eye].unsqueeze(0),
+            self.flame_param['translation'][0].unsqueeze(0),
+            zero_centered_at_root_node=False,
+            return_landmarks=False,
+            return_verts_cano=True,
+            static_offset=self.flame_param['static_offset'],
+        )
+        self.update_mesh_properties(verts, verts_cano)
+
     def select_mesh_by_timestep(self, timestep, original=False):
         self.timestep = timestep
         flame_param = self.flame_param_orig if original and self.flame_param_orig != None else self.flame_param
@@ -131,6 +154,27 @@ class FlameGaussianModel(GaussianModel):
             return_verts_cano=True,
             static_offset=flame_param['static_offset'],
             dynamic_offset=flame_param['dynamic_offset'][[timestep]],
+        )
+        self.update_mesh_properties(verts, verts_cano)
+
+    def select_mesh_by_timestep_arkit(self, timestep, arkit_weights, original=False):
+        self.timestep = timestep
+        flame_param = self.flame_param_orig if original and self.flame_param_orig != None else self.flame_param
+
+        verts, verts_cano = self.flame_model(
+            flame_param['shape'][None, ...],
+            flame_param['expr'][[0]],
+            flame_param['rotation'][[0]],
+            flame_param['neck_pose'][[0]],
+            flame_param['jaw_pose'][[0]],
+            flame_param['eyes_pose'][[0]],
+            flame_param['translation'][[0]],
+            zero_centered_at_root_node=False,
+            return_landmarks=False,
+            return_verts_cano=True,
+            static_offset=flame_param['static_offset'],
+            dynamic_offset=flame_param['dynamic_offset'][[0]],
+            arkit_weights=arkit_weights.cuda(),
         )
         self.update_mesh_properties(verts, verts_cano)
     
