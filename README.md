@@ -14,8 +14,8 @@ pip install -r requirements.txt  # can take a while for compiling pytorch3d and 
 ```
 SUBJECT=218 
 python train.py \
--s data/218/UNION10_${SUBJECT}_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine \
--m output/218/UNION10EMOEXP_${SUBJECT}_eval_600k \
+-s data/${SUBJECT}/UNION10_${SUBJECT}_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
 --port 60000 --eval --white_background --bind_to_mesh
 ```
 
@@ -23,9 +23,30 @@ python train.py \
 ```
 SUBJECT=218
 python render.py \
--m output/218/UNION10EMOEXP_${SUBJECT}_eval_600k \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
 --skip_train --skip_test
 ```
+**render with custom FLAME params** \
+- ```MODE``` : method of generating FLAME params, either ```emote``` or ```voca```
+- ```SUBJECT``` : target ID 
+- ```FLAME_FILE``` : flame file name  
+- ```CAM_ID``` : camera ID
+- ```AUDIO``` : audio name, for experiment naming. 
+```
+SUBJECT=218
+MODE=emote
+FLAMEFILE='flame_218_Obama_Sad_1.pkl'
+CAM_ID=0
+AUDIO=obama
+
+python render_param.py \
+-m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_600k \
+--skip_val --skip_test \
+--flame flame_${MODE}_coeffs/${FLAME_FILE} \
+--expname ${SUBJECT}_${MODE}_${AUDIO}_cam_${CAM_ID} \
+--select_camera_id ${CAM_ID} --mode ${MODE}
+```
+
 
 ## FLAME
 
