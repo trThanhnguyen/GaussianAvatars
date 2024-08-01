@@ -44,18 +44,16 @@ def sample_orbit_views(orbit_cam: OrbitCamera, sq_len: int, swing: int):
     """
     orbit_views = []
 
-    # Example pattern
-    # Increase dx to swing value, then decrease it to negative swing, repeat
-    # dy = -dx
-    Dx_ = np.concatenate((np.ones(swing), np.negative(np.ones(2*swing)), np.ones(swing)))
+    # Example pattern:
+    # Circle camera around throughout 240 time steps, magnitude defined by swing variable
+    Dx_ = np.linspace(0, 2*3.14, 240)
     Dx = np.tile(Dx_, sq_len)
-    Dy = np.negative(Dx)
 
     for i in tqdm(range(sq_len), desc= "Preparing views"):
-        dx = Dx[i]
-        dy = Dy[i]
+        dx = swing * np.sin(Dx[i])
+        dy = swing * np.cos(Dx[i])
         orbit_cam.orbit(dx, dy)
-        view = orbit_cam.pop_view(reset=False)
+        view = orbit_cam.pop_view(reset=True)
         # Reset to original camera pose after each iter
         # If not, changes are additive
         # Depends on your choice of pattern
@@ -83,7 +81,7 @@ def write_data(path2data):
         else:
             raise NotImplementedError(f"Unknown file type: {path.suffix}")
 
-def render_set(dataset : ModelParams, gaussians, pipeline, background, render_mesh, flame_file, mode, runname):
+def render_set(dataset : ModelParams, gaussians, pipeline, background, render_mesh, flame_file, audio_path, mode, runname):
     
     save_dir = 'orbit_rendering'
     render_path = os.path.join(save_dir , runname)
@@ -118,7 +116,7 @@ def render_set(dataset : ModelParams, gaussians, pipeline, background, render_me
             file=flame_file,
             allow_pickle=True).item()
         new_exp = torch.tensor(new_flame_param['expression'], dtype=torch.float32)
-        new_jaw = torch.tensor(new_flame_param['pose'][:, 6:9], dtype=torch.float32) * 2 # scale jaw pose
+        new_jaw = torch.tensor(new_flame_param['pose'][:, 6:9], dtype=torch.float32) * 1.5 # scale jaw pose
         # new_neck = torch.tensor(new_flame_param['global_pose'])
         frame_rate = 60
         slow_eye_factor = 2
@@ -126,7 +124,7 @@ def render_set(dataset : ModelParams, gaussians, pipeline, background, render_me
     orbit_cam = OrbitCamera(W, H, r, fovy, convention="opencv")
     sequence_len = new_exp.shape[0]
 
-    views = sample_orbit_views(orbit_cam, sequence_len, swing=60)
+    views = sample_orbit_views(orbit_cam, sequence_len, swing=50)
     ###### should be a function
     ###################       
 
@@ -164,11 +162,11 @@ def render_set(dataset : ModelParams, gaussians, pipeline, background, render_me
             worker_args = []
     
     try:
-        os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_path}/*.png' -pix_fmt yuv420p {save_dir}/{runname}.mp4")
+        os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_path}/*.png' -i {audio_path} -pix_fmt yuv420p {save_dir}/{runname}.mp4")
     except Exception as e:
         print(e)
 
-def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, render_mesh: bool, is_debugging:bool, flame_file:str, mode:str, runname: str):
+def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, render_mesh: bool, is_debugging:bool, flame_file:str, audio: str, mode:str, runname: str):
 
     assert mode in ['emote', 'voca']
 
@@ -185,7 +183,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-        render_set(dataset, gaussians, pipeline, background, render_mesh, flame_file, mode, runname)
+        render_set(dataset, gaussians, pipeline, background, render_mesh, flame_file, audio, mode, runname)
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -200,6 +198,7 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--render_mesh", action="store_true")
     parser.add_argument("--flame", type=str, required=True)
+    parser.add_argument("--audio", type=str, required=True)
     parser.add_argument("--mode", type=str, required=True)
     parser.add_argument("--runname", type=str, default='renders')
     args = get_combined_args(parser)
@@ -211,4 +210,4 @@ if __name__ == "__main__":
     # print("source", models.source_path) # ./data/306/UNION10_306_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine
     # print("target", models.target_path)
     # print("model", models.model_path)
-    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.render_mesh, args.debug_flag, args.flame, args.mode, args.runname)
+    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.render_mesh, args.debug_flag, args.flame, args.audio, args.mode, args.runname)
