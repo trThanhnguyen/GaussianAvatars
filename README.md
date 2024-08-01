@@ -55,15 +55,17 @@ SUBJECT=074
 ITER=600k
 python orbit_render.py \
 -m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
---flame flame_emote_coeffs/flame_074_Chinese_neutral.pkl \
+--flame flame_voca_coeffs/chinese_params.npy \
+--audio audios/chinese.wav \
 --mode emote \
---runname 074_emote_Chinese_orbit
+--runname 074_voca_chinese_orbit
 ```
 
 Where,
 - ```-m``` : trained model path
 - ```--mode``` : method of generating FLAME params, either ```emote``` or ```voca```
 - ```--flame``` : flame file name containing varying expression
+- ```--audio``` : path to audio file, enabling audio-video writing
 - ```--runname``` : experiment name, for output naming purpose.
 
 
