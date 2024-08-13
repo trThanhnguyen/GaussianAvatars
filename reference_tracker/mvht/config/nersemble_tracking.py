@@ -25,7 +25,7 @@ class NersembleDataConfig(DataConfig):
     use_color_correction: bool = True
     use_alpha_map: bool = False
     use_landmark: bool = True
-    landmark_source: Optional[Literal["face-alignment", "pipnet", 'star']] = "star"
+    landmark_source: Optional[Literal["face-alignment", "pipnet", 'star']] = "face-alignment"
 
     
 @dataclass()

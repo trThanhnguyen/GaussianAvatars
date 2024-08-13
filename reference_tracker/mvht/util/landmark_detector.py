@@ -301,9 +301,9 @@ if __name__ == "__main__":
         sequence=args.sequence,
         scale_factor=args.scale_factor,
     )
-    dataset.items = dataset.items[:2]
+    dataset.items = dataset.items
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=8)
 
-    detector = LandmarkDetector()
+    detector = LandmarkDetector(face_detector='sfd')
     detector.annotate_landmarks(dataloader)

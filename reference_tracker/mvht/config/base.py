@@ -37,6 +37,7 @@ class DataConfig(Config):
     background_color: Optional[Literal['white', 'black']] = None
     use_alpha_map: bool = False
     use_landmark: bool = True
+    landmark_source: str = 'face-alignment'
 
 
 @dataclass()
