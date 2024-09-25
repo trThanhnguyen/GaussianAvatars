@@ -1,3 +1,5 @@
+## Latest changes
+- reduce sh degree by specifying it in terminal argument
 ## 踩坑日記
 
 **目前沒坑嘿嘿**
@@ -57,7 +59,7 @@ python orbit_render.py \
 -m output/${SUBJECT}/UNION10EMOEXP_${SUBJECT}_eval_${ITER} \
 --flame flame_voca_coeffs/chinese_params.npy \
 --audio audios/chinese.wav \
---mode emote \
+--mode voca \
 --runname 074_voca_chinese_orbit
 ```
 
