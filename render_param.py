@@ -29,6 +29,10 @@ from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel, FlameGaussianModel
 from mesh_renderer import NVDiffRenderer
 
+### for stp
+from diff_gaussian_rasterization import ExtendedSettings
+from arguments.stp import SplattingSettings
+###
 
 
 mesh_renderer = NVDiffRenderer()
@@ -52,7 +56,7 @@ def write_data(path2data):
         else:
             raise NotImplementedError(f"Unknown file type: {path.suffix}")
 
-def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipeline, background, render_mesh, flame_file, mode, expname):
+def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipeline, background, render_mesh, flame_file, audio_path, mode, expname, splat_args):
     if dataset.select_camera_id != -1:
         name = f"{name}_{dataset.select_camera_id}"
     iter_path = Path(dataset.model_path) / name / f"ours_{iteration}"
@@ -91,23 +95,27 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
             file=flame_file,
             allow_pickle=True).item()
         new_exp = torch.tensor(new_flame_param['expression'], dtype=torch.float32)
-        new_jaw = torch.tensor(new_flame_param['pose'][:, 6:9], dtype=torch.float32) * 2 # scale jaw pose
+        new_jaw = torch.tensor(new_flame_param['pose'][:, 6:9], dtype=torch.float32) 
+        # scale jaw pose (only scale R_x-axis when it's positive)
+        new_jaw[:, 0][new_jaw[:,0] > 0] *= 2
         # new_neck = torch.tensor(new_flame_param['global_pose'])
         frame_rate = 60
         slow_eye_factor = 2
 
     size = new_exp.shape[0] 
     fix_init_view = True
-    same_view = None
 
-    for idx, view in enumerate(tqdm(views_loader, desc="Rendering progress")):
+    # Fix view real
+    view = list(views_loader)[0]
+
+    for idx in (tqdm(range(size), desc="Rendering progress")):
         if gaussians.binding != None:
             gaussians.select_mesh_by_timestep(view.timestep)
 
-        if idx == 0:
-            same_view=view
-        if idx == size:
-            break
+        # if idx == 0:
+        #     same_view=view
+        # if idx == size:
+        #     break
 
         gaussians.update_mesh_by_param_expr_dict(
             new_exp[idx].reshape(1, -1),
@@ -119,9 +127,9 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
         
         ##########################
         if fix_init_view:
-            rendering = render(views[0], gaussians, pipeline, background)["render"]
+            rendering = render(views[0], gaussians, pipeline, background, splat_args=splat_args)["render"]
         else:
-            rendering = render(view, gaussians, pipeline, background)["render"]
+            rendering = render(view, gaussians, pipeline, background, splat_args=splat_args)["render"]
         gt = view.original_image[0:3, :, :]
         if render_mesh:
             out_dict = mesh_renderer.render_from_camera(gaussians.verts, gaussians.faces, view)
@@ -145,14 +153,13 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
             worker_args = []
     
     try:
-        os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_path}/*.png' -pix_fmt yuv420p {iter_path}/{expname}.mp4")
-        os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{gts_path}/*.png' -pix_fmt yuv420p {iter_path}/gt.mp4")
+        os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_path}/*.png' -i {audio_path} -b:v 5M -pix_fmt yuv420p {iter_path}/{expname}.mp4")
         if render_mesh:
-            os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_mesh_path}/*.png' -pix_fmt yuv420p {iter_path}/{expname}_mesh.mp4")
+            os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_mesh_path}/*.png' -b:v 5M -pix_fmt yuv420p {iter_path}/{expname}_mesh.mp4")
     except Exception as e:
         print(e)
 
-def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_val : bool, skip_test : bool, render_mesh: bool, is_debugging:bool, flame_file:str, mode:str, expname: str):
+def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_val : bool, skip_test : bool, render_mesh: bool, is_debugging:bool, flame_file:str, audio_path:str, mode:str, expname: str, splat_args: ExtendedSettings):
 
     assert mode in ['emote', 'voca']
 
@@ -170,7 +177,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         if dataset.target_path != "":
              name = os.path.basename(os.path.normpath(dataset.target_path))
              # when loading from a target path, test cameras are merged into the train cameras
-             render_set(dataset, f'{name}', scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, flame_file, mode, expname)
+             render_set(dataset, f'{name}', scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, flame_file, mode, expname, splat_args=splat_args)
         else:
             """
             Modify to get custom views here
@@ -181,13 +188,13 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 val_cameras = scene.getValCameras()
             else:
                 if not skip_train:
-                    render_set(dataset, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, flame_file, mode, expname)
+                    render_set(dataset, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, flame_file, audio_path, mode, expname, splat_args=splat_args)
                 
                 if not skip_val:
-                    render_set(dataset, "val", scene.loaded_iter, scene.getValCameras(), gaussians, pipeline, background, render_mesh, flame_file, mode, expname)
+                    render_set(dataset, "val", scene.loaded_iter, scene.getValCameras(), gaussians, pipeline, background, render_mesh, flame_file, audio_path, mode, expname, splat_args=splat_args)
 
                 if not skip_test:
-                    render_set(dataset, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, render_mesh, flame_file, mode, expname)
+                    render_set(dataset, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, render_mesh, flame_file, audio_path, mode, expname, splat_args=splat_args)
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -202,10 +209,15 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--render_mesh", action="store_true")
     parser.add_argument("--flame", type=str, required=True)
+    parser.add_argument("--audio", type=str, required=True)
     parser.add_argument("--mode", type=str, required=True)
     parser.add_argument("--expname", type=str, default='renders')
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)
+
+    ## for stp
+    ss = SplattingSettings(parser)
+    splat_args = ss.get_settings(args)
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
@@ -213,4 +225,4 @@ if __name__ == "__main__":
     # print("source", models.source_path) # ./data/306/UNION10_306_EMO1234EXP234589_v16_DS2-0.5x_lmkSTAR_teethV3_SMOOTH_offsetS_whiteBg_maskBelowLine
     # print("target", models.target_path)
     # print("model", models.model_path)
-    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.skip_train, args.skip_val, args.skip_test, args.render_mesh, args.debug_flag, args.flame, args.mode, args.expname)
+    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.skip_train, args.skip_val, args.skip_test, args.render_mesh, args.debug_flag, args.flame, args.audio, args.mode, args.expname, splat_args)

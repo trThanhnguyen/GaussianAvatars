@@ -25,6 +25,8 @@ import numpy as np
 import pickle
 from collections import defaultdict
 from pytorch3d.io import load_obj
+import argparse
+# import trimesh
 
 FLAME_MESH_PATH = "flame_model/assets/flame/head_template_mesh.obj"
 FLAME_LMK_PATH = "flame_model/assets/flame/landmark_embedding_with_eyes.npy"
@@ -437,7 +439,7 @@ class FlameHead(nn.Module):
             [99, 100, 114],  # 130
             [100, 115, 114],  # 131
             [100, 101, 115],  # 132
-            [101, 116, 114],  # 133
+            [101, 116, 115],  # 133
             [101, 102, 116],  # 134
             [102, 117, 116],  # 135
             [102, 103, 117],  # 136
@@ -490,6 +492,7 @@ class FlameHead(nn.Module):
         zero_centered_at_root_node=False,  # otherwise, zero centered at the face
         return_landmarks=True,
         return_verts_cano=False,
+        return_faces=False,
         static_offset=None,
         dynamic_offset=None,
     ):
@@ -510,6 +513,7 @@ class FlameHead(nn.Module):
         
         # Add shape contribution
         v_shaped = template_vertices + blend_shapes(betas, self.shapedirs)
+        ## Essentially the same as vht flame.py and lbs.py, just moves add shape to here
 
         # Add personal offsets
         if static_offset is not None:
@@ -547,6 +551,9 @@ class FlameHead(nn.Module):
                 self.full_lmk_bary_coords.repeat(bz, 1, 1),
             )
             ret_vals.append(landmarks)
+        
+        if return_faces:
+            ret_vals.append(self.faces)
 
         if len(ret_vals) > 1:
             return ret_vals
@@ -921,4 +928,27 @@ class FlameMask(nn.Module):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--params', type=str, help='Path to .npz containing FLAME params to save mesh.')
+    parser.add_argument('--obj_path', type=str, help='Path to which mesh will be saved.')
+    args = parser.parse_args()
+
     flame_model = FlameHead(shape_params=300, expr_params=100)
+    params = np.load(args.params)
+    vertices, _, faces = flame_model(shape=torch.tensor(params['shape']).unsqueeze(0),
+                                     expr=torch.tensor(params['expr']),
+                                     neck=torch.tensor(params['neck_pose']),
+                                     jaw=torch.tensor(params['jaw_pose']),
+                                     eyes=torch.tensor(params['eyes_pose']),
+                                     rotation=torch.tensor(params['rotation']),
+                                     translation=torch.tensor(params['translation']),
+                                     return_faces=True)
+    # vertices, _, faces = flame_model(**params, return_faces=True)
+
+    print("Creating mesh...")
+    mesh = trimesh.Trimesh(vertices=vertices.cpu().numpy(), faces=faces)
+    mesh.export(args.obj_path)
+    print(f"Saved mesh at {args.obj_path}.")
+
+
+    

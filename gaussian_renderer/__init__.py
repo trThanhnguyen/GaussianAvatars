@@ -12,11 +12,12 @@
 import torch
 import math
 from typing import Union
-from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+# from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+from diff_gaussian_rasterization import GaussianRasterizationSettings, ExtendedSettings, GaussianRasterizer
 from scene import GaussianModel, FlameGaussianModel
 from utils.sh_utils import eval_sh
 
-def render(viewpoint_camera, pc : Union[GaussianModel, FlameGaussianModel], pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+def render(viewpoint_camera, pc : Union[GaussianModel, FlameGaussianModel], pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None, splat_args: ExtendedSettings = None, render_depth: bool = False):
     """
     Render the scene. 
     
@@ -43,9 +44,12 @@ def render(viewpoint_camera, pc : Union[GaussianModel, FlameGaussianModel], pipe
         scale_modifier=scaling_modifier,
         viewmatrix=viewpoint_camera.world_view_transform.cuda(),
         projmatrix=viewpoint_camera.full_proj_transform.cuda(),
+        inv_viewprojmatrix=viewpoint_camera.full_proj_transform_inverse.cuda(),
         sh_degree=pc.active_sh_degree,
         campos=viewpoint_camera.camera_center.cuda(),
         prefiltered=False,
+        settings=splat_args,
+        render_depth=render_depth,
         debug=pipe.debug
     )
 

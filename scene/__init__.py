@@ -118,7 +118,7 @@ class Scene:
                 for id, cam in enumerate(camlist):
                     json_cams.append(camera_to_JSON(id, cam))
                 with open(os.path.join(self.model_path, "cameras.json"), 'w') as file:
-                    json.dump(json_cams, file)
+                    json.dump(json_cams, file, indent=4)
 
             if shuffle:
                 random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling

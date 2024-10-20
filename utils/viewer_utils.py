@@ -8,7 +8,7 @@
 
 import torch
 from dataclasses import dataclass
-from typing import Tuple, Literal
+from typing_extensions import Tuple, Literal
 import math
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -71,7 +71,7 @@ def projection_from_intrinsics(K: np.ndarray, image_size: Tuple[int], near: floa
 
 
 class OrbitCamera:
-    def __init__(self, W, H, r=2, fovy=60, znear=0.01, zfar=10, convention: Literal["opengl", "opencv"]="opengl", save_path='camera.json'):
+    def __init__(self, W, H, r=2, fovy=60, znear=0.01, zfar=0.1, convention: Literal["opengl", "opencv"]="opengl", save_path='camera.json'):
         self.image_width = W
         self.image_height = H
         self.radius_default = r
@@ -81,7 +81,9 @@ class OrbitCamera:
         self.convention = convention
         self.save_path = save_path
 
+        # This up vector is arbitrary and is selected to be [0, 1, 0] as a convention to calculate the right vector
         self.up = np.array([0, 1, 0], dtype=np.float32)
+        # From here we know that y is up direction
         self.reset()
         self.load()
     
@@ -147,6 +149,10 @@ class OrbitCamera:
         return self.projection_matrix @ self.world_view_transform
 
     @property
+    def full_proj_transform_inverse(self):
+        return np.linalg.inv(self.world_view_transform @ self.projection_matrix)
+
+    @property
     def pose(self):
         # first move camera to radius
         pose = np.eye(4, dtype=np.float32)
@@ -191,6 +197,7 @@ class OrbitCamera:
             image_width = self.image_width
             world_view_transform = torch.tensor(self.world_view_transform).float().cuda().T  # the transpose is required by gaussian splatting rasterizer
             full_proj_transform = torch.tensor(self.full_proj_transform).float().cuda().T  # the transpose is required by gaussian splatting rasterizer
+            full_proj_transform_inverse = torch.tensor(self.full_proj_transform_inverse).float().cuda().T # the transpose is required by gaussian splatting rasterizer
             camera_center = torch.tensor(self.pose[:3, 3]).cuda()
             if reset:
                 self.reset()

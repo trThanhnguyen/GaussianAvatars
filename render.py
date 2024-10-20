@@ -21,12 +21,15 @@ from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
+import copy
 
 from gaussian_renderer import render
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel, FlameGaussianModel
+from arguments.stp import SplattingSettings
+from diff_gaussian_rasterization import ExtendedSettings
 from mesh_renderer import NVDiffRenderer
 
 
@@ -51,7 +54,7 @@ def write_data(path2data):
         else:
             raise NotImplementedError(f"Unknown file type: {path.suffix}")
 
-def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipeline, background, render_mesh):
+def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipeline, background, render_mesh, splat_args: ExtendedSettings, render_depth: bool):
     if dataset.select_camera_id != -1:
         name = f"{name}_{dataset.select_camera_id}"
     iter_path = Path(dataset.model_path) / name / f"ours_{iteration}"
@@ -59,6 +62,11 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
     gts_path = iter_path / "gt"
     if render_mesh:
         render_mesh_path = iter_path / "renders_mesh"
+    ply_path = iter_path / "point_cloud"
+    makedirs(ply_path, exist_ok=True)
+    bindings = copy.deepcopy(gaussians)
+    # bindings = bindings.get_xyz()
+    bindings.save_ply_gaussian(ply_path / "bindings.ply")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
@@ -70,7 +78,7 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
     for idx, view in enumerate(tqdm(views_loader, desc="Rendering progress")):
         if gaussians.binding != None:
             gaussians.select_mesh_by_timestep(view.timestep)
-        rendering = render(view, gaussians, pipeline, background)["render"]
+        rendering = render(view, gaussians, pipeline, background, splat_args=splat_args, render_depth=render_depth)["render"]
         gt = view.original_image[0:3, :, :]
         if render_mesh:
             out_dict = mesh_renderer.render_from_camera(gaussians.verts, gaussians.faces, view)
@@ -101,7 +109,7 @@ def render_set(dataset : ModelParams, name, iteration, views, gaussians, pipelin
     except Exception as e:
         print(e)
 
-def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_val : bool, skip_test : bool, render_mesh: bool):
+def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_val : bool, skip_test : bool, render_mesh: bool, splat_args: ExtendedSettings, render_depth: bool):
     with torch.no_grad():
         if dataset.bind_to_mesh:
             # gaussians = FlameGaussianModel(dataset.sh_degree, dataset.disable_flame_static_offset)
@@ -116,32 +124,36 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         if dataset.target_path != "":
              name = os.path.basename(os.path.normpath(dataset.target_path))
              # when loading from a target path, test cameras are merged into the train cameras
-             render_set(dataset, f'{name}', scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh)
+             render_set(dataset, f'{name}', scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, splat_args, render_depth)
         else:
             if not skip_train:
-                render_set(dataset, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh)
+                render_set(dataset, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background, render_mesh, splat_args, render_depth)
             
             if not skip_val:
-                render_set(dataset, "val", scene.loaded_iter, scene.getValCameras(), gaussians, pipeline, background, render_mesh)
+                render_set(dataset, "val", scene.loaded_iter, scene.getValCameras(), gaussians, pipeline, background, render_mesh, splat_args, render_depth)
 
             if not skip_test:
-                render_set(dataset, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, render_mesh)
+                render_set(dataset, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background, render_mesh, splat_args, render_depth)
 
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
     model = ModelParams(parser, sentinel=True)
     pipeline = PipelineParams(parser)
+    ss = SplattingSettings(parser, render=True)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_val", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--render_mesh", action="store_true")
+    parser.add_argument("--render_depth", action="store_true", default=False)
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)
+
+    splat_args = ss.get_settings(args)
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
-    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.skip_train, args.skip_val, args.skip_test, args.render_mesh)
+    render_sets(model.extract(args), args.iteration, pipeline.extract(args), args.skip_train, args.skip_val, args.skip_test, args.render_mesh, splat_args, args.render_depth)
