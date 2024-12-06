@@ -120,7 +120,7 @@ class GaussianModel:
                 self.select_mesh_by_timestep(0)
 
             scaling = self.scaling_activation(self._scaling)
-            return scaling * self.face_scaling[self.binding]
+            return scaling * self.face_scaling[self.binding.long()]
     
     @property
     def get_rotation(self):
@@ -133,7 +133,7 @@ class GaussianModel:
 
             # always need to normalize the rotation quaternions before chaining them
             rot = self.rotation_activation(self._rotation)
-            face_orien_quat = self.rotation_activation(self.face_orien_quat[self.binding])
+            face_orien_quat = self.rotation_activation(self.face_orien_quat[self.binding.long()])
             return quat_xyzw_to_wxyz(quat_product(quat_wxyz_to_xyzw(rot), quat_wxyz_to_xyzw(face_orien_quat)))  # roma
             # return quaternion_multiply(rot, face_orien_quat)  # pytorch3d
     
@@ -146,8 +146,8 @@ class GaussianModel:
             if self.face_center is None:
                 self.select_mesh_by_timestep(0)
             
-            xyz = torch.bmm(self.face_orien_mat[self.binding], self._xyz[..., None]).squeeze(-1)
-            return xyz * self.face_scaling[self.binding] + self.face_center[self.binding]
+            xyz = torch.bmm(self.face_orien_mat[self.binding.long()], self._xyz[..., None]).squeeze(-1)
+            return xyz * self.face_scaling[self.binding.long()] + self.face_center[self.binding.long()]
 
     @property
     def get_features(self):
