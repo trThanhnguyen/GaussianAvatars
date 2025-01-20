@@ -7,6 +7,4 @@
 [submodule "VHAP"]
 	path = VHAP
 	url = https://github.com/ShenhanQian/VHAP.git
-[submodule "submodules/StopThePop-Rasterization"]
-	path = submodules/StopThePop-Rasterization
-	url = https://github.com/r4dl/StopThePop-Rasterization.git
+
