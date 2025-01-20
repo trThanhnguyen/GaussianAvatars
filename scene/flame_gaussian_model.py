@@ -260,7 +260,7 @@ class FlameGaussianModel(GaussianModel):
         # param_dynamic_offset = {'params': [self.flame_param['dynamic_offset']], 'lr': 1.6e-6, "name": "dynamic_offset"}
         # self.optimizer.add_param_group(param_dynamic_offset)
 
-    def save_ply(self, path):
+    def save_ply_gaussian(self, path):
         super().save_ply(path)
 
         npz_path = Path(path).parent / "flame_param.npz"

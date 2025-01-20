@@ -20,12 +20,15 @@ from mesh_renderer import NVDiffRenderer
 import sys
 from scene import Scene, GaussianModel, FlameGaussianModel
 from utils.general_utils import safe_state
+import json
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr, error_map
 from lpipsPyTorch import lpips
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
+from arguments.stp import SplattingSettings
+from diff_gaussian_rasterization import ExtendedSettings
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_FOUND = True
@@ -33,17 +36,20 @@ except ImportError:
     TENSORBOARD_FOUND = False
 
 #           lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, splat_args: ExtendedSettings, opacity_decay: float = 0):
     first_iter = 0
-    tb_writer = prepare_output_and_logger(dataset)
+    tb_writer = prepare_output_and_logger(dataset, splat_args)
     if dataset.bind_to_mesh:
         gaussians = FlameGaussianModel(dataset.sh_degree, dataset.disable_flame_static_offset, dataset.not_finetune_flame_params)
+        print('init FlameGaussianModel out')
         # set shape, expr params to 100 and 50 to fit DECA configuration
         # gaussians = FlameGaussianModel(dataset.sh_degree, dataset.disable_flame_static_offset, dataset.not_finetune_flame_params, 100, 50)
         mesh_renderer = NVDiffRenderer()
+        print('set rerdnerer done')
     else:
         gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
+    print('scene established')
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -79,7 +85,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     
                     # gaussian splatting rendering
                     if msg['show_splatting']:
-                        net_image = render(custom_cam, gaussians, pipe, background, msg['scaling_modifier'])["render"]
+                        net_image = render(custom_cam, gaussians, pipe, background, msg['scaling_modifier'], splat_args=splat_args)["render"]
                     
                     # mesh rendering
                     if gaussians.binding != None and msg['show_mesh']:
@@ -124,7 +130,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Render
         if (iteration - 1) == debug_from:
             pipe.debug = True
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background, splat_args=splat_args)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # Loss
@@ -189,7 +195,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.close()
 
             # Log and save
-            training_report(tb_writer, iteration, losses, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
+            training_report(tb_writer, iteration, losses, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background,  1, None, splat_args))
             if (iteration in saving_iterations):
                 print("[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
@@ -216,7 +222,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
-def prepare_output_and_logger(args):    
+def prepare_output_and_logger(args, settings):    
     if not args.model_path:
         if os.getenv('OAR_JOB_ID'):
             unique_str=os.getenv('OAR_JOB_ID')
@@ -229,6 +235,10 @@ def prepare_output_and_logger(args):
     os.makedirs(args.model_path, exist_ok = True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
         cfg_log_f.write(str(Namespace(**vars(args))))
+        
+    # Write stp config file 
+    with open(os.path.join(args.model_path, "config.json"), 'w') as config_json:
+        json.dump(settings.to_dict(), config_json)
 
     # Create Tensorboard writer
     tb_writer = None
@@ -322,16 +332,18 @@ if __name__ == "__main__":
     lp = ModelParams(parser) # set dataset path, folders, things about image, meshes...
     op = OptimizationParams(parser) # set lr, scale, iter...
     pp = PipelineParams(parser) # compute cov3D, convert sh 
+    ss = SplattingSettings(parser)
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--interval", type=int, default=60_000, help="A shared iteration interval for test and saving results and checkpoints.")
+    parser.add_argument("--interval", type=int, default=30_000, help="A shared iteration interval for test and saving results and checkpoints.")
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
+    parser.add_argument("--opacity_decay", type=float, default=0)
     args = parser.parse_args(sys.argv[1:])
     if len(args.test_iterations) == 0:
         args.test_iterations.extend(list(range(args.interval, args.iterations, args.interval)) + [args.iterations])
@@ -352,7 +364,11 @@ if __name__ == "__main__":
     network_gui.init(args.ip, args.port) # 設定
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
     # 輸入包括 ()
-    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    
+    # from stop the pop
+    splat_args = ss.get_settings(args)
+
+    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, splat_args, args.opacity_decay)
 
     # All done
     print("\nTraining complete.")

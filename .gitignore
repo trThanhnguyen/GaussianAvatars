@@ -1,4 +1,8 @@
 *.pyc
+submodules/StopThePop-Rasterization
+VHAP/
+reference_tracker/
+preprocessing/
 .vscode
 output
 build
@@ -10,5 +14,7 @@ orbit_rendering/
 flame_emote_coeffs/
 flame_voca_coeffs/
 sandbox/
+preprocessing/
+audios
 
 data/
