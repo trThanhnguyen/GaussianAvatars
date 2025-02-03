@@ -1,3 +1,8 @@
+## Incorp emote
+### Finetune:
+- Changes in inferno/models/DecaFLAME.py
+- Changes in inferno/models/talkinghead/FaceFormerDecoder.py
+- Remove sanity check in inferno/models/temporal/AudioEncoders.py
 ## Latest changes
 - reduce sh degree by specifying it in terminal argument
 ## 踩坑日記

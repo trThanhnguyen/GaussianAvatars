@@ -1,3 +1,6 @@
+inferno_apps/TalkingHead/pretrained
+inferno/assets
+inferno/sandbox
 *.pyc
 submodules/StopThePop-Rasterization
 VHAP/

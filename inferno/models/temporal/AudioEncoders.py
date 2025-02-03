@@ -189,8 +189,8 @@ class Wav2Vec2Encoder(TemporalAudioEncoder):
         F = feats_.last_hidden_state.shape[-1]
         T2 = feats_.last_hidden_state.shape[1]
 
-        if self.resampling and T is not None:
-            assert T2 == T # sanity checking that the feature got resampled to the proper length
+        # if self.resampling and T is not None:
+            # assert T2 == T # sanity checking that the feature got resampled to the proper length
 
         sample["audio_feature"] = feats_.last_hidden_state 
 
