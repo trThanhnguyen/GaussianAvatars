@@ -27,12 +27,12 @@ from arguments.stp import SplattingSettings
 class EMOTEInference:
     """Handle EMOTE inference to get FLAME parameters."""
     
-    def __init__(self, model_path):
+    def __init__(self, model_path, emote_ckpt_mode):
         from inferno_apps.TalkingHead.evaluation.TalkingHeadWrapper import TalkingHeadWrapper
         from inferno_apps.TalkingHead.evaluation.evaluation_functions import read_audio, process_audio, create_condition
         
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.talking_head = TalkingHeadWrapper(Path(model_path), render_results=False).to(self.device)
+        self.talking_head = TalkingHeadWrapper(Path(model_path), ckpt_mode=emote_ckpt_mode, render_results=False).to(self.device)
         self.read_audio = read_audio
         self.process_audio = process_audio
         self.create_condition = create_condition
@@ -210,7 +210,8 @@ class RenderManager:
         # Create video with audio if audio path is provided
         if audio_path:
             frame_rate = 25  # EMOTE default frame rate
-            output_video = os.path.join(os.path.dirname(render_path), "output.mp4")
+            video_name = render_path.parent.stem
+            output_video = os.path.join(os.path.dirname(render_path), f"{video_name}.mp4")
             os.system(f"ffmpeg -y -framerate {frame_rate} -f image2 -pattern_type glob -i '{render_path}/*.png' "
                      f"-i {audio_path} -b:v 5M -pix_fmt yuv420p {output_video}")
 
@@ -229,14 +230,19 @@ def main():
     parser.add_argument("--emotion_idx", type=int, default=0)
     parser.add_argument("--intensity_idx", type=int, default=0)
     parser.add_argument("--expname", type=str, default='renders')
+    parser.add_argument("--emote_ckpt_mode", type=str, default='latest')
     parser.add_argument("--neutral_mesh_path", type=str, default='')
     
     args = get_combined_args(parser)
     splat_args = SplattingSettings(parser).get_settings(args)
+
+    if args.render_type != 'orbit':
+        assert args.select_camera_id != -1, "Not orbit -> camera ID must be provided"
     
     # Initialize renderers and EMOTE
     render_manager = RenderManager(render_type=args.render_type)
-    emote = EMOTEInference(args.emote_model)
+    emote = EMOTEInference(args.emote_model, args.emote_ckpt_mode)
+    print(f'Initialized EMOTE with ckpt mode <{args.emote_ckpt_mode}>')
     
     with torch.no_grad():
         # Initialize Gaussian model
@@ -277,3 +283,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+    """
+    python render_union.py \ 
+    --model_path output/nguyen_v24_sh1/ \ 
+    --audio audios/japanese.wav \ 
+    --render_type orbit \ 
+    --expname test_fix_render \ 
+    --iteration 360000 \ 
+    --emote_ckpt_mode finetuned
+    """
