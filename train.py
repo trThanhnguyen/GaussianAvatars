@@ -41,11 +41,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     tb_writer = prepare_output_and_logger(dataset, splat_args)
     if dataset.bind_to_mesh:
         gaussians = FlameGaussianModel(dataset.sh_degree, dataset.disable_flame_static_offset, dataset.not_finetune_flame_params)
-        print('init FlameGaussianModel out')
         # set shape, expr params to 100 and 50 to fit DECA configuration
         # gaussians = FlameGaussianModel(dataset.sh_degree, dataset.disable_flame_static_offset, dataset.not_finetune_flame_params, 100, 50)
         mesh_renderer = NVDiffRenderer()
-        print('set rerdnerer done')
     else:
         gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
@@ -337,7 +335,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--interval", type=int, default=30_000, help="A shared iteration interval for test and saving results and checkpoints.")
+    parser.add_argument("--interval", type=int, default=60_000, help="A shared iteration interval for test and saving results and checkpoints.")
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--quiet", action="store_true")
